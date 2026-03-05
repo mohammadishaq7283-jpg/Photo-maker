@@ -1,0 +1,25 @@
+# --- Python Garbage ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+
+# --- Security ---
+.env
+.env.local
+.env.*.local
+
+# --- Editor Junk ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# --- Vercel ---
+.vercel
