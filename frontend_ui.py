@@ -4,251 +4,229 @@ HTML_CODE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PixelMystic AI</title>
+    <title>PixelMystic Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Fabric.js for Image Editing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <style>
-        /* Themes */
-        :root { --primary: #00f3ff; --bg: #050505; --card: #121212; --text: #fff; }
-        [data-theme="light"] { --primary: #2563eb; --bg: #f3f4f6; --card: #ffffff; --text: #1f2937; }
+        :root { --primary: #00f3ff; --bg: #0a0a0a; --panel: #1a1a1a; --text: #fff; }
+        body { background: var(--bg); color: var(--text); font-family: sans-serif; overflow: hidden; }
         
-        body { background: var(--bg); color: var(--text); transition: 0.3s; font-family: sans-serif; }
-        .theme-card { background: var(--card); border: 1px solid rgba(128,128,128,0.1); }
-        .theme-btn { background: var(--primary); color: black; font-weight: bold; }
+        .tool-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 70px; height: 70px; border-radius: 12px; background: #222; color: #aaa; transition: 0.2s; cursor: pointer; border: 1px solid #333; }
+        .tool-btn:hover, .tool-btn.active { background: var(--primary); color: #000; border-color: var(--primary); }
+        .tool-btn i { margin-bottom: 5px; }
         
-        /* Loader */
-        .loader { border: 3px solid rgba(255,255,255,0.1); border-top: 3px solid var(--primary); border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        canvas { border: 2px dashed #333; border-radius: 8px; }
+        
+        .panel { background: var(--panel); border-left: 1px solid #333; padding: 15px; width: 300px; display: flex; flex-direction: column; gap: 15px; }
+        
+        .filter-btn { padding: 8px; border-radius: 6px; background: #333; color: white; cursor: pointer; text-align: center; font-size: 12px; }
+        .filter-btn:hover { background: var(--primary); color: black; }
     </style>
 </head>
-<body class="h-screen flex overflow-hidden">
+<body class="flex h-screen">
 
-    <!-- SIDEBAR -->
-    <div id="sidebar" class="w-72 theme-card border-r h-full flex flex-col transition-all transform -translate-x-full md:translate-x-0 absolute md:relative z-20 shadow-xl">
-        <div class="p-4 border-b border-gray-700/20 flex justify-between items-center">
-            <h2 class="font-bold text-lg" style="color: var(--primary)">HISTORY</h2>
-            <button onclick="toggleSidebar()" class="md:hidden"><i data-lucide="x"></i></button>
+    <!-- TOOLBAR (Left) -->
+    <div class="w-20 bg-[#111] border-r border-[#333] flex flex-col items-center py-4 gap-3 overflow-y-auto">
+        <div class="tool-btn active" onclick="setTool('ai')" title="AI Generator"><i data-lucide="sparkles"></i><span class="text-[10px]">AI Gen</span></div>
+        <div class="tool-btn" onclick="setTool('filters')" title="Filters"><i data-lucide="palette"></i><span class="text-[10px]">Filters</span></div>
+        <div class="tool-btn" onclick="setTool('text')" title="Add Text"><i data-lucide="type"></i><span class="text-[10px]">Text</span></div>
+        <div class="tool-btn" onclick="setTool('stickers')" title="Stickers"><i data-lucide="smile"></i><span class="text-[10px]">Stickers</span></div>
+        <div class="tool-btn" onclick="setTool('frames')" title="Frames"><i data-lucide="frame"></i><span class="text-[10px]">Frames</span></div>
+        <div class="mt-auto tool-btn bg-green-600 text-white" onclick="downloadImage()"><i data-lucide="download"></i><span class="text-[10px]">Save</span></div>
+    </div>
+
+    <!-- CANVAS AREA (Center) -->
+    <div class="flex-1 flex flex-col items-center justify-center bg-[#000] relative">
+        <canvas id="canvas"></canvas>
+        <div id="placeholder" class="absolute text-gray-500 text-center pointer-events-none">
+            <i data-lucide="image" class="w-16 h-16 mx-auto mb-2 opacity-50"></i>
+            <p>Generate AI Art or Upload Image</p>
         </div>
         
-        <div class="p-4 space-y-3">
-            <label class="text-xs text-gray-500 font-bold uppercase">Language / Zaban</label>
-            <select id="lang-select" class="w-full p-3 rounded-lg theme-card border border-gray-600 outline-none text-sm">
-                <option value="English">English 🇺🇸</option>
-                <option value="Urdu">Urdu (اردو) 🇵🇰</option>
-                <option value="Roman Urdu">Roman Urdu (Kaisay ho) 🗣️</option>
-                <option value="Hindi">Hindi (हिंदी) 🇮🇳</option>
-                <option value="Arabic">Arabic (العربية) 🇸🇦</option>
-                <option value="Spanish">Spanish (Español) 🇪🇸</option>
-                <option value="French">French (Français) 🇫🇷</option>
-                <option value="German">German (Deutsch) 🇩🇪</option>
-                <option value="Chinese">Chinese (中文) 🇨🇳</option>
-            </select>
-
-            <button onclick="startNewChat()" class="w-full flex items-center gap-2 p-3 rounded-lg border border-dashed border-gray-500 hover:bg-white/5 transition text-sm font-medium">
-                <i data-lucide="plus" class="w-4"></i> New Chat
-            </button>
-        </div>
-
-        <div id="history-list" class="flex-1 overflow-y-auto p-2 space-y-1"></div>
-
-        <div class="p-4 border-t border-gray-700/20">
-            <button onclick="toggleTheme()" class="flex items-center gap-3 w-full p-2 rounded hover:bg-white/5 text-sm">
-                <i data-lucide="moon" class="w-4"></i> Switch Theme
-            </button>
+        <!-- Bottom Floating Bar -->
+        <div class="absolute bottom-5 bg-[#222] p-3 rounded-full flex gap-4 shadow-xl border border-[#333]">
+            <input type="file" id="upload" hidden onchange="handleUpload(this)">
+            <button onclick="document.getElementById('upload').click()" class="flex items-center gap-2 px-4 py-2 bg-[#333] rounded-full hover:bg-white/10"><i data-lucide="upload" class="w-4"></i> Upload</button>
+            <button onclick="shareWhatsapp()" class="flex items-center gap-2 px-4 py-2 bg-green-600 rounded-full hover:bg-green-500"><i data-lucide="share-2" class="w-4"></i> Share</button>
         </div>
     </div>
 
-    <!-- MAIN CHAT -->
-    <div class="flex-1 flex flex-col h-full relative">
-        <!-- Header -->
-        <div class="h-16 theme-card border-b flex items-center px-4 justify-between z-10">
-            <div class="flex items-center gap-3">
-                <button onclick="toggleSidebar()" class="md:hidden"><i data-lucide="menu"></i></button>
-                <h1 class="font-bold text-xl flex items-center gap-2" style="color: var(--primary)">
-                    <i data-lucide="sparkles" class="w-5"></i> PixelMystic
-                </h1>
+    <!-- SETTINGS PANEL (Right) -->
+    <div class="panel" id="panel">
+        <h3 class="font-bold text-lg border-b border-gray-700 pb-2" id="panel-title">AI Generator</h3>
+        
+        <!-- AI TOOLS -->
+        <div id="tool-ai" class="space-y-4">
+            <textarea id="ai-prompt" placeholder="Describe image (e.g. Cyberpunk cat)" class="w-full p-3 rounded bg-[#222] border border-[#444] text-white h-24 outline-none focus:border-[var(--primary)]"></textarea>
+            <button onclick="generateAI()" class="w-full py-3 bg-[var(--primary)] text-black font-bold rounded hover:opacity-90 flex justify-center gap-2">
+                <i data-lucide="zap"></i> Generate
+            </button>
+            <div id="loading" class="hidden text-center text-sm text-gray-400">Creating magic...</div>
+        </div>
+
+        <!-- FILTERS -->
+        <div id="tool-filters" class="hidden grid grid-cols-2 gap-2">
+            <div class="filter-btn" onclick="applyFilter('sepia')">Sepia</div>
+            <div class="filter-btn" onclick="applyFilter('grayscale')">B & W</div>
+            <div class="filter-btn" onclick="applyFilter('vintage')">Vintage</div>
+            <div class="filter-btn" onclick="applyFilter('invert')">Invert</div>
+            <div class="filter-btn" onclick="applyFilter('blur')">Blur</div>
+            <div class="filter-btn bg-red-600" onclick="resetFilters()">Reset</div>
+        </div>
+
+        <!-- TEXT -->
+        <div id="tool-text" class="hidden space-y-3">
+            <input type="text" id="text-input" placeholder="Enter text..." class="w-full p-2 rounded bg-[#222] border border-[#444]">
+            <div class="flex gap-2">
+                <input type="color" id="text-color" class="h-10 w-10 p-0 border-0 rounded cursor-pointer" value="#ffffff">
+                <button onclick="addText()" class="flex-1 bg-blue-600 rounded">Add Text</button>
             </div>
         </div>
 
-        <!-- Messages -->
-        <div id="chat-container" class="flex-1 overflow-y-auto p-4 space-y-6">
-            <!-- Welcome Message -->
-            <div class="flex flex-col items-center justify-center h-full opacity-50 text-center space-y-4" id="welcome-msg">
-                <i data-lucide="aperture" class="w-16 h-16"></i>
-                <p>Upload a photo to analyze or ask to generate an image.</p>
-            </div>
+        <!-- STICKERS -->
+        <div id="tool-stickers" class="hidden grid grid-cols-4 gap-2 text-2xl">
+            <div class="cursor-pointer hover:scale-110" onclick="addEmoji('🔥')">🔥</div>
+            <div class="cursor-pointer hover:scale-110" onclick="addEmoji('❤️')">❤️</div>
+            <div class="cursor-pointer hover:scale-110" onclick="addEmoji('😂')">😂</div>
+            <div class="cursor-pointer hover:scale-110" onclick="addEmoji('👑')">👑</div>
+            <div class="cursor-pointer hover:scale-110" onclick="addEmoji('🕶️')">🕶️</div>
+            <div class="cursor-pointer hover:scale-110" onclick="addEmoji('🚀')">🚀</div>
         </div>
-
-        <!-- Input Area -->
-        <div class="p-4 theme-card border-t">
-            <div id="image-preview" class="hidden mb-2 relative w-fit">
-                <img id="preview-img" class="h-16 rounded-lg border border-gray-500 shadow-md">
-                <button onclick="removeImage()" class="absolute -top-2 -right-2 bg-red-500 rounded-full w-5 h-5 text-white flex items-center justify-center text-xs shadow-sm">×</button>
-            </div>
-            
-            <div class="flex gap-2 items-center">
-                <input type="file" id="file-input" class="hidden" accept="image/*" onchange="handleImage(this)">
-                
-                <button onclick="document.getElementById('file-input').click()" class="p-3 rounded-xl hover:bg-white/10 theme-card border border-gray-600/50 transition">
-                    <i data-lucide="image" class="w-5 text-gray-400"></i>
-                </button>
-                
-                <input id="user-input" type="text" placeholder="Describe an image or ask anything..." class="flex-1 p-3 rounded-xl theme-card border border-gray-600/50 outline-none focus:border-blue-500 transition" onkeydown="if(event.key === 'Enter') sendMessage()">
-                
-                <button onclick="sendMessage()" id="send-btn" class="p-3 rounded-xl theme-btn hover:opacity-90 shadow-lg shadow-blue-500/20 transition">
-                    <i data-lucide="send" class="w-5"></i>
-                </button>
+        
+        <!-- HISTORY -->
+        <div class="mt-auto pt-4 border-t border-gray-700">
+            <h4 class="text-sm font-bold mb-2">History</h4>
+            <div id="history-list" class="flex gap-2 overflow-x-auto pb-2">
+                <!-- Thumbs -->
             </div>
         </div>
     </div>
 
     <script>
         lucide.createIcons();
-        let sessions = JSON.parse(localStorage.getItem('pm_sessions')) || [];
-        let currentId = null;
-        let currentImage = null;
-
-        // Init
-        if(sessions.length === 0) startNewChat();
-        else { renderHistory(); loadSession(sessions[0].id); }
+        const canvas = new fabric.Canvas('canvas', { width: 500, height: 500, backgroundColor: '#111' });
         
-        // Theme Check
-        if(localStorage.getItem('pm_theme') === 'light') document.documentElement.setAttribute('data-theme', 'light');
-
-        function toggleTheme() {
-            const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-            document.documentElement.setAttribute('data-theme', isLight ? 'dark' : 'light');
-            localStorage.setItem('pm_theme', isLight ? 'dark' : 'light');
+        // Resize canvas on load
+        function resizeCanvas() {
+            const container = document.querySelector('.flex-1');
+            canvas.setWidth(container.clientWidth * 0.8);
+            canvas.setHeight(container.clientHeight * 0.8);
+            canvas.renderAll();
         }
+        window.addEventListener('resize', resizeCanvas);
+        setTimeout(resizeCanvas, 100);
 
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('-translate-x-full');
-        }
-
-        function startNewChat() {
-            const id = Date.now().toString();
-            sessions.unshift({ id, title: "New Chat", messages: [] });
-            saveSessions();
-            loadSession(id);
-            if(window.innerWidth < 768) document.getElementById('sidebar').classList.add('-translate-x-full');
-        }
-
-        function loadSession(id) {
-            currentId = id;
-            renderHistory();
-            const session = sessions.find(s => s.id === id);
-            const container = document.getElementById('chat-container');
-            container.innerHTML = '';
+        function setTool(tool) {
+            document.querySelectorAll('.tool-btn').forEach(el => el.classList.remove('active'));
+            event.currentTarget.classList.add('active');
             
-            if(session.messages.length > 0) document.getElementById('welcome-msg')?.remove();
-            else container.innerHTML = `<div class="flex flex-col items-center justify-center h-full opacity-50 text-center space-y-4" id="welcome-msg"><i data-lucide="aperture" class="w-16 h-16"></i><p>Upload a photo or start chatting.</p></div>`;
-
-            session.messages.forEach(msg => appendMessage(msg));
-            lucide.createIcons();
+            document.getElementById('panel-title').innerText = tool.toUpperCase();
+            ['ai', 'filters', 'text', 'stickers', 'frames'].forEach(id => {
+                document.getElementById('tool-'+id)?.classList.add('hidden');
+            });
+            document.getElementById('tool-'+tool)?.classList.remove('hidden');
         }
 
-        function renderHistory() {
-            const list = document.getElementById('history-list');
-            list.innerHTML = sessions.map(s => `
-                <div onclick="loadSession('${s.id}')" class="p-3 rounded-lg cursor-pointer truncate text-sm transition ${s.id === currentId ? 'bg-white/10 border-l-2 border-[var(--primary)]' : 'hover:bg-white/5'}">
-                    ${s.messages[0]?.content || s.title}
-                </div>
-            `).join('');
+        // --- AI GENERATION ---
+        async function generateAI() {
+            const prompt = document.getElementById('ai-prompt').value;
+            if(!prompt) return alert("Enter a prompt!");
+            
+            document.getElementById('loading').classList.remove('hidden');
+            
+            // Using Pollinations AI (Free & Fast)
+            const seed = Math.floor(Math.random() * 1000);
+            const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?seed=${seed}&width=512&height=512&nologo=true`;
+            
+            fabric.Image.fromURL(url, (img) => {
+                img.scaleToWidth(canvas.width);
+                canvas.centerObject(img);
+                canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
+                document.getElementById('placeholder').style.display = 'none';
+                document.getElementById('loading').classList.add('hidden');
+                addToHistory(url);
+            }, { crossOrigin: 'anonymous' });
         }
 
-        function saveSessions() {
-            localStorage.setItem('pm_sessions', JSON.stringify(sessions));
-            renderHistory();
-        }
-
-        function handleImage(input) {
+        // --- UPLOAD ---
+        function handleUpload(input) {
             const file = input.files[0];
-            if(file) {
-                const reader = new FileReader();
-                reader.onload = e => {
-                    currentImage = e.target.result;
-                    document.getElementById('preview-img').src = currentImage;
-                    document.getElementById('image-preview').classList.remove('hidden');
-                };
-                reader.readAsDataURL(file);
-            }
-        }
-
-        function removeImage() {
-            currentImage = null;
-            document.getElementById('image-preview').classList.add('hidden');
-            document.getElementById('file-input').value = '';
-        }
-
-        async function sendMessage() {
-            const input = document.getElementById('user-input');
-            const text = input.value.trim();
-            if(!text && !currentImage) return;
-
-            document.getElementById('welcome-msg')?.remove();
-
-            const userMsg = { role: 'user', content: text, image: currentImage };
-            appendMessage(userMsg);
-            
-            const session = sessions.find(s => s.id === currentId);
-            session.messages.push(userMsg);
-            saveSessions();
-
-            input.value = '';
-            removeImage();
-            const loadingDiv = showLoading();
-
-            try {
-                const res = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        messages: session.messages,
-                        locale: document.getElementById('lang-select').value
-                    })
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                fabric.Image.fromURL(e.target.result, (img) => {
+                    img.scaleToWidth(canvas.width);
+                    canvas.centerObject(img);
+                    canvas.add(img);
+                    canvas.setActiveObject(img);
+                    document.getElementById('placeholder').style.display = 'none';
                 });
-                
-                const data = await res.json();
-                loadingDiv.remove();
-
-                const aiMsg = { 
-                    role: 'assistant', 
-                    content: data.reply, 
-                    generatedImage: data.generatedImageUrl 
-                };
-                
-                appendMessage(aiMsg);
-                session.messages.push(aiMsg);
-                saveSessions();
-
-            } catch(e) {
-                loadingDiv.innerHTML = "⚠️ Error: " + e.message;
-            }
+            };
+            reader.readAsDataURL(file);
         }
 
-        function showLoading() {
-            const div = document.createElement('div');
-            div.className = "flex gap-2 items-center text-gray-500 ml-2";
-            div.innerHTML = `<div class="loader"></div> <span class="text-sm">Magic in progress...</span>`;
-            document.getElementById('chat-container').appendChild(div);
-            return div;
+        // --- FILTERS ---
+        function applyFilter(type) {
+            const obj = canvas.getActiveObject();
+            if(!obj || !obj.filters) return alert("Select an image first!");
+            
+            if(type === 'sepia') obj.filters.push(new fabric.Image.filters.Sepia());
+            if(type === 'grayscale') obj.filters.push(new fabric.Image.filters.Grayscale());
+            if(type === 'invert') obj.filters.push(new fabric.Image.filters.Invert());
+            if(type === 'blur') obj.filters.push(new fabric.Image.filters.Blur({ blur: 0.5 }));
+            if(type === 'vintage') obj.filters.push(new fabric.Image.filters.Vintage());
+            
+            obj.applyFilters();
+            canvas.renderAll();
+        }
+        
+        function resetFilters() {
+            const obj = canvas.getActiveObject();
+            if(obj) { obj.filters = []; obj.applyFilters(); canvas.renderAll(); }
         }
 
-        function appendMessage(msg) {
-            const div = document.createElement('div');
-            div.className = `flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`;
-            
-            let contentHtml = '';
-            if(msg.image) contentHtml += `<img src="${msg.image}" class="w-64 rounded-xl border border-gray-700 mb-2 shadow-lg">`;
-            if(msg.content) contentHtml += `<div class="p-3.5 rounded-2xl max-w-lg leading-relaxed shadow-sm whitespace-pre-wrap ${msg.role === 'user' ? 'theme-btn rounded-br-none' : 'theme-card rounded-bl-none text-sm'}">${msg.content}</div>`;
-            if(msg.generatedImage) contentHtml += `<div class="mt-3 group relative"><img src="${msg.generatedImage}" class="w-72 rounded-xl shadow-xl border border-[var(--primary)]"><a href="${msg.generatedImage}" download class="absolute bottom-3 right-3 bg-black/80 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition"><i data-lucide="download" class="w-4 h-4"></i></a></div>`;
+        // --- TEXT & STICKERS ---
+        function addText() {
+            const text = document.getElementById('text-input').value || "Hello";
+            const color = document.getElementById('text-color').value;
+            const t = new fabric.IText(text, { left: 100, top: 100, fill: color, fontSize: 40 });
+            canvas.add(t);
+        }
 
-            div.innerHTML = `<div class="flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}">${contentHtml}</div>`;
-            
-            const container = document.getElementById('chat-container');
-            container.appendChild(div);
-            container.scrollTop = container.scrollHeight;
-            lucide.createIcons();
+        function addEmoji(emoji) {
+            const t = new fabric.IText(emoji, { left: 150, top: 150, fontSize: 60 });
+            canvas.add(t);
+        }
+
+        // --- DOWNLOAD & SHARE ---
+        function downloadImage() {
+            const link = document.createElement('a');
+            link.download = 'pixel-art.png';
+            link.href = canvas.toDataURL({ format: 'png', quality: 1.0 });
+            link.click();
+        }
+
+        function shareWhatsapp() {
+            // Note: WhatsApp API only allows text sharing directly, image requires manual attach
+            alert("Image downloaded! You can now share it on WhatsApp.");
+            downloadImage();
+            window.open(`https://wa.me/?text=Check out my AI art!`, '_blank');
+        }
+
+        // --- HISTORY ---
+        function addToHistory(url) {
+            const list = document.getElementById('history-list');
+            const img = document.createElement('img');
+            img.src = url;
+            img.className = "w-12 h-12 rounded border border-gray-600 cursor-pointer hover:border-white";
+            img.onclick = () => {
+                fabric.Image.fromURL(url, (i) => {
+                    canvas.setBackgroundImage(i, canvas.renderAll.bind(canvas));
+                }, { crossOrigin: 'anonymous' });
+            };
+            list.prepend(img);
         }
     </script>
 </body>
