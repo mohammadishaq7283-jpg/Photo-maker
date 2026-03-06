@@ -10,12 +10,13 @@ from PIL import Image
 app = Flask(__name__)
 
 # --- KEYS ---
-CHAT_API_KEY = os.getenv("OPENROUTER_API_KEY") # Chat
-HF_API_KEY = os.getenv("HUGGING_FACE_KEY") # Image (New)
+CHAT_API_KEY = os.getenv("OPENROUTER_API_KEY") 
+HF_API_KEY = os.getenv("HUGGING_FACE_KEY") 
 
 CHAT_MODEL = "stepfun/step-3.5-flash:free"
-# Best Free/Pro Model on HF: Flux.1-dev or Stable Diffusion 3
-HF_MODEL_URL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev"
+
+# ✅ UPDATED URL (Router API)
+HF_MODEL_URL = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-dev"
 
 try:
     from frontend_ui import HTML_CODE
@@ -58,7 +59,7 @@ def chat_api():
         reply = response.json()['choices'][0]['message']['content']
         generated_image = None
 
-        # 2. Image Generation (Hugging Face)
+        # 2. Image Generation (Hugging Face Updated)
         if 'GENERATE_IMAGE' in reply:
             match = re.search(r'\{"GENERATE_IMAGE":\s*"(.*?)"\}', reply)
             if match:
@@ -66,7 +67,6 @@ def chat_api():
                 
                 if HF_API_KEY:
                     try:
-                        # Hugging Face API Call
                         hf_res = requests.post(
                             HF_MODEL_URL,
                             headers={"Authorization": f"Bearer {HF_API_KEY}"},
@@ -75,29 +75,28 @@ def chat_api():
                         )
                         
                         if hf_res.status_code == 200:
-                            # HF returns raw bytes (image) -> Convert to Base64 for UI
                             image_bytes = hf_res.content
-                            # Check if valid image
                             try:
                                 img = Image.open(io.BytesIO(image_bytes))
                                 buffered = io.BytesIO()
                                 img.save(buffered, format="PNG")
                                 img_str = base64.b64encode(buffered.getvalue()).decode()
                                 generated_image = f"data:image/png;base64,{img_str}"
-                                reply = reply.replace(match.group(0), "🎨 Generated with Flux (Hugging Face):")
+                                reply = reply.replace(match.group(0), "🎨 Generated with Flux (HF):")
                             except:
-                                reply += "\n(HF Error: Model loading... try again in 30s)"
+                                reply += "\n(HF Loading... Retrying)"
                         else:
-                            reply += f"\n(HF API Error: {hf_res.text})"
+                            # Log error silently and fallback
+                            print(f"HF Error: {hf_res.text}")
                     except Exception as e:
                         print(f"HF Failed: {e}")
                 
-                # Fallback to Pollinations if HF fails or no key
+                # Fallback
                 if not generated_image:
                     import random
                     seed = random.randint(1, 10000)
                     generated_image = f"https://image.pollinations.ai/prompt/{prompt}?seed={seed}&nologo=true"
-                    reply = reply.replace(match.group(0), "🎨 Generated with Pollinations (Free):")
+                    reply = reply.replace(match.group(0), "🎨 Generated (Free Mode):")
 
         return jsonify({"reply": reply, "generatedImageUrl": generated_image})
 
