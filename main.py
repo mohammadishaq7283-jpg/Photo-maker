@@ -5,6 +5,8 @@ import json
 import re
 import io
 import base64
+import random
+import urllib.parse # ✅ New Import for fixing links
 from PIL import Image
 
 app = Flask(__name__)
@@ -14,8 +16,6 @@ CHAT_API_KEY = os.getenv("OPENROUTER_API_KEY")
 HF_API_KEY = os.getenv("HUGGING_FACE_KEY") 
 
 CHAT_MODEL = "stepfun/step-3.5-flash:free"
-
-# ✅ UPDATED URL (Router API)
 HF_MODEL_URL = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-dev"
 
 try:
@@ -53,25 +53,27 @@ def chat_api():
         response = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             headers={"Authorization": f"Bearer {CHAT_API_KEY}"},
-            json={"model": CHAT_MODEL, "messages": final_messages}
+            json={"model": CHAT_MODEL, "messages": final_messages},
+            timeout=30
         )
         
         reply = response.json()['choices'][0]['message']['content']
         generated_image = None
 
-        # 2. Image Generation (Hugging Face Updated)
+        # 2. Image Generation Logic
         if 'GENERATE_IMAGE' in reply:
             match = re.search(r'\{"GENERATE_IMAGE":\s*"(.*?)"\}', reply)
             if match:
-                prompt = match.group(1)
+                raw_prompt = match.group(1)
                 
+                # --- Attempt 1: Hugging Face (High Quality) ---
                 if HF_API_KEY:
                     try:
                         hf_res = requests.post(
                             HF_MODEL_URL,
                             headers={"Authorization": f"Bearer {HF_API_KEY}"},
-                            json={"inputs": prompt},
-                            timeout=60
+                            json={"inputs": raw_prompt},
+                            timeout=50
                         )
                         
                         if hf_res.status_code == 200:
@@ -79,23 +81,23 @@ def chat_api():
                             try:
                                 img = Image.open(io.BytesIO(image_bytes))
                                 buffered = io.BytesIO()
-                                img.save(buffered, format="PNG")
+                                img.save(buffered, format="JPEG") # Changed to JPEG for speed
                                 img_str = base64.b64encode(buffered.getvalue()).decode()
-                                generated_image = f"data:image/png;base64,{img_str}"
+                                generated_image = f"data:image/jpeg;base64,{img_str}"
                                 reply = reply.replace(match.group(0), "🎨 Generated with Flux (HF):")
                             except:
-                                reply += "\n(HF Loading... Retrying)"
-                        else:
-                            # Log error silently and fallback
-                            print(f"HF Error: {hf_res.text}")
+                                pass # Fallback to free if bytes are bad
                     except Exception as e:
                         print(f"HF Failed: {e}")
                 
-                # Fallback
+                # --- Attempt 2: Pollinations (Free Mode - FIX APPLIED) ---
                 if not generated_image:
-                    import random
                     seed = random.randint(1, 10000)
-                    generated_image = f"https://image.pollinations.ai/prompt/{prompt}?seed={seed}&nologo=true"
+                    # ✅ FIX: Spaces ko %20 me badalna zaroori hai
+                    encoded_prompt = urllib.parse.quote(raw_prompt)
+                    
+                    generated_image = f"https://image.pollinations.ai/prompt/{encoded_prompt}?seed={seed}&width=1024&height=1024&nologo=true"
+                    
                     reply = reply.replace(match.group(0), "🎨 Generated (Free Mode):")
 
         return jsonify({"reply": reply, "generatedImageUrl": generated_image})
