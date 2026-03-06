@@ -16,12 +16,10 @@ HTML_CODE = """
         .nav-item.active { color: var(--primary); border-left: 3px solid var(--primary); background: rgba(255,255,255,0.05); }
         .nav-item:hover { color: #fff; }
         
-        /* EDITOR Styles */
         .tool-btn { background: #222; border: 1px solid #333; padding: 10px; border-radius: 8px; cursor: pointer; text-align: center; }
         .tool-btn:hover { background: var(--primary); color: black; }
         canvas { border: 2px dashed #333; }
         
-        /* CHAT Styles */
         .chat-bubble { padding: 12px; border-radius: 12px; max-width: 80%; margin-bottom: 10px; }
         .user-msg { background: var(--primary); color: black; align-self: flex-end; margin-left: auto; }
         .ai-msg { background: #222; color: #ddd; align-self: flex-start; border: 1px solid #333; }
@@ -29,30 +27,24 @@ HTML_CODE = """
 </head>
 <body>
 
-    <!-- 1. SIDEBAR NAVIGATION -->
+    <!-- SIDEBAR -->
     <div class="w-20 bg-[#111] border-r border-[#222] flex flex-col pt-4">
-        <div class="nav-item active" onclick="switchTab('chat')" id="nav-chat">
-            <i data-lucide="message-square"></i> CHAT
-        </div>
-        <div class="nav-item" onclick="switchTab('editor')" id="nav-editor">
-            <i data-lucide="palette"></i> EDITOR
-        </div>
-        <div class="mt-auto nav-item" onclick="location.reload()">
-            <i data-lucide="refresh-cw"></i> RESET
-        </div>
+        <div class="nav-item active" onclick="switchTab('chat')" id="nav-chat"><i data-lucide="message-square"></i> CHAT</div>
+        <div class="nav-item" onclick="switchTab('editor')" id="nav-editor"><i data-lucide="palette"></i> EDITOR</div>
+        <div class="mt-auto nav-item" onclick="location.reload()"><i data-lucide="refresh-cw"></i> RESET</div>
     </div>
 
-    <!-- 2. MAIN CONTENT AREA -->
+    <!-- MAIN CONTENT -->
     <div class="flex-1 relative">
         
-        <!-- === TAB 1: CHAT & VISION (Old Logic) === -->
+        <!-- TAB 1: CHAT -->
         <div id="tab-chat" class="h-full flex flex-col">
             <div class="h-16 border-b border-[#222] flex items-center px-6 font-bold text-xl text-[var(--primary)]">
                 <i data-lucide="sparkles" class="mr-2"></i> PixelMystic Chat
             </div>
             
             <div id="chat-box" class="flex-1 overflow-y-auto p-4 flex flex-col">
-                <div class="ai-msg chat-bubble">Hello! Upload a photo to analyze or ask me to generate an image.</div>
+                <div class="ai-msg chat-bubble">Hello! Describe an image to generate it.</div>
             </div>
             
             <div class="p-4 border-t border-[#222] bg-[#0a0a0a]">
@@ -66,42 +58,33 @@ HTML_CODE = """
             </div>
         </div>
 
-        <!-- === TAB 2: PHOTO EDITOR (New Logic) === -->
+        <!-- TAB 2: EDITOR -->
         <div id="tab-editor" class="h-full hidden flex-col md:flex-row">
-            <!-- Canvas -->
             <div class="flex-1 bg-[#000] flex items-center justify-center relative p-4">
                 <canvas id="editor-canvas"></canvas>
                 <div id="editor-placeholder" class="absolute text-gray-600 pointer-events-none text-center">
-                    <i data-lucide="image-plus" class="w-16 h-16 mx-auto mb-2"></i>
-                    <p>Upload Image or Generate AI Art</p>
+                    <i data-lucide="image-plus" class="w-16 h-16 mx-auto mb-2"></i><p>Upload or Generate</p>
                 </div>
             </div>
             
-            <!-- Tools Panel -->
             <div class="w-full md:w-80 bg-[#111] border-l border-[#222] p-4 flex flex-col gap-4 overflow-y-auto">
                 <h3 class="font-bold text-[var(--primary)]">TOOLS</h3>
-                
                 <div class="grid grid-cols-2 gap-2">
                     <input type="file" id="editor-upload" hidden onchange="handleEditorUpload(this)">
                     <div class="tool-btn" onclick="document.getElementById('editor-upload').click()"><i data-lucide="upload"></i> Upload</div>
                     <div class="tool-btn" onclick="downloadArt()"><i data-lucide="download"></i> Save</div>
                 </div>
-
                 <div class="border-t border-[#333] my-2"></div>
-                
                 <h4 class="text-sm font-bold text-gray-400">AI GENERATOR</h4>
                 <textarea id="ai-prompt" class="w-full bg-[#222] p-2 rounded border border-[#333] text-sm" placeholder="e.g. Cyberpunk city"></textarea>
                 <button onclick="generateArt()" class="w-full bg-[var(--primary)] text-black font-bold py-2 rounded">Generate</button>
-
                 <div class="border-t border-[#333] my-2"></div>
-
                 <h4 class="text-sm font-bold text-gray-400">FILTERS</h4>
                 <div class="grid grid-cols-3 gap-2 text-xs">
                     <div class="tool-btn" onclick="applyFilter('sepia')">Sepia</div>
                     <div class="tool-btn" onclick="applyFilter('grayscale')">B&W</div>
                     <div class="tool-btn" onclick="applyFilter('vintage')">Vintage</div>
                 </div>
-
                 <h4 class="text-sm font-bold text-gray-400 mt-2">ADD</h4>
                 <div class="flex gap-2">
                     <button onclick="addText()" class="flex-1 bg-blue-600 py-2 rounded text-xs">Text</button>
@@ -118,22 +101,18 @@ HTML_CODE = """
         let chatImage = null;
         const canvas = new fabric.Canvas('editor-canvas', { width: 500, height: 500 });
 
-        // --- TABS ---
         function switchTab(tab) {
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
             document.getElementById('nav-'+tab).classList.add('active');
-            
             document.getElementById('tab-chat').classList.add('hidden');
             document.getElementById('tab-editor').classList.add('hidden');
             document.getElementById('tab-'+tab).classList.remove('hidden');
-            
             if(tab === 'editor') {
-                document.getElementById('tab-editor').style.display = 'flex'; // Fix flex issue
+                document.getElementById('tab-editor').style.display = 'flex';
                 resizeCanvas();
             }
         }
 
-        // --- CHAT LOGIC ---
         function handleChatUpload(input) {
             const file = input.files[0];
             if(file) {
@@ -152,7 +131,6 @@ HTML_CODE = """
             const text = input.value.trim();
             if(!text && !chatImage) return;
 
-            // UI Update
             const chatBox = document.getElementById('chat-box');
             let userHtml = `<div class="user-msg chat-bubble">${text}`;
             if(chatImage) userHtml += `<br><img src="${chatImage}" class="mt-2 w-32 rounded">`;
@@ -164,7 +142,6 @@ HTML_CODE = """
             document.getElementById('img-preview').classList.add('hidden');
             chatBox.scrollTop = chatBox.scrollHeight;
 
-            // API Call
             try {
                 const res = await fetch('/api/chat', {
                     method: 'POST',
@@ -177,7 +154,13 @@ HTML_CODE = """
                 const data = await res.json();
                 
                 let aiHtml = `<div class="ai-msg chat-bubble">${data.reply}`;
-                if(data.generatedImageUrl) aiHtml += `<br><img src="${data.generatedImageUrl}" class="mt-2 w-64 rounded">`;
+                
+                // --- FIX: Add referrerpolicy to allow loading ---
+                if(data.generatedImageUrl) {
+                    aiHtml += `<br><img src="${data.generatedImageUrl}" class="mt-2 w-64 rounded shadow-lg border border-gray-600" referrerpolicy="no-referrer">`;
+                    aiHtml += `<br><a href="${data.generatedImageUrl}" target="_blank" download class="text-xs text-blue-400 underline mt-1">Download HD</a>`;
+                }
+                
                 aiHtml += `</div>`;
                 chatBox.innerHTML += aiHtml;
                 chatBox.scrollTop = chatBox.scrollHeight;
@@ -187,9 +170,8 @@ HTML_CODE = """
             }
         }
 
-        // --- EDITOR LOGIC ---
         function resizeCanvas() {
-            const container = document.querySelector('#tab-editor > div'); // Canvas container
+            const container = document.querySelector('#tab-editor > div');
             if(container) {
                 canvas.setWidth(container.clientWidth * 0.9);
                 canvas.setHeight(container.clientHeight * 0.9);
@@ -231,11 +213,9 @@ HTML_CODE = """
         function applyFilter(type) {
             const obj = canvas.getActiveObject();
             if(!obj || !obj.filters) return alert("Select an image first!");
-            
             if(type === 'sepia') obj.filters.push(new fabric.Image.filters.Sepia());
             if(type === 'grayscale') obj.filters.push(new fabric.Image.filters.Grayscale());
             if(type === 'vintage') obj.filters.push(new fabric.Image.filters.Vintage());
-            
             obj.applyFilters();
             canvas.renderAll();
         }
